@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>距离场</title>
+    <style>
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <script src="http://threejs.org/build/three.min.js"></script>
+
+    <script id="vertexShader" type="x-shader/x-vertex">
+        void main() {
+            gl_Position = vec4( position, 1.0 );
+        }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        uniform vec2 u_resolution;
+        uniform vec2 u_mouse;
+        uniform float u_time;
+
+        void main(){
+          vec2 st = gl_FragCoord.xy/u_resolution.xy;
+          st.x *= u_resolution.x/u_resolution.y;
+          vec3 color = vec3(0.0);
+          float d = 0.0;
+
+          // 将空间重新映射为 -1 为 1
+          st = st *2.-1.;
+
+          // 制作距离场
+          d = length( abs(st)-.3 );
+          // d = length( min(abs(st)-.3,0.) );
+          // d = length( max(abs(st)-.3,0.) );
+
+          // 可视化距离场
+          gl_FragColor = vec4(vec3(fract(d*10.0)),1.0);
+
+          // 用距离场绘图
+          // gl_FragColor = vec4(vec3( step(.3,d) ),1.0);
+          // gl_FragColor = vec4(vec3( step(.3,d) * step(d,.4)),1.0);
+          // gl_FragColor = vec4(vec3( smoothstep(.3,.4,d)* smoothstep(.6,.5,d)) ,1.0);
+        }
+    </script>
+
+    <script>
+        var container;
+        var camera, scene, renderer, clock;
+        var uniforms;
+        var mouse = {x:0, y:0};
+
+        document.onmousemove = getMouseXY;
+
+        init();
+        animate();
+
+        function getMouseXY(e) {
+            mouse.x = e.pageX;
+            mouse.y = e.pageY;
+        }
+
+        function init() {
+            container = document.getElementById( 'container' );
+
+            camera = new THREE.Camera();
+            camera.position.z = 1;
+
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+
+            var geometry = new THREE.PlaneBufferGeometry( 2, 2 );
+
+            uniforms = {
+                u_time: { type: "f", value: 1.0 },
+                u_mouse: { type: "v2", value: new THREE.Vector2() },
+                u_resolution: { type: "v2", value: new THREE.Vector2() }
+            };
+
+            var material = new THREE.ShaderMaterial( {
+                uniforms: uniforms,
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+            } );
+
+            var mesh = new THREE.Mesh( geometry, material );
+            scene.add( mesh );
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+
+            container.appendChild( renderer.domElement );
+
+            onWindowResize();
+            window.addEventListener( 'resize', onWindowResize, false );
+        }
+
+        function onWindowResize( event ) {
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            uniforms.u_resolution.value.x = renderer.domElement.width;
+            uniforms.u_resolution.value.y = renderer.domElement.height;
+            uniforms.u_mouse.value.x = mouse.x;
+            uniforms.u_mouse.value.y = mouse.y;
+        }
+
+        function animate() {
+            requestAnimationFrame( animate );
+            render();
+        }
+
+        function render() {
+            uniforms.u_time.value += clock.getDelta();
+            renderer.render( scene, camera );
+        }
+    </script>
+</body>
+</html>

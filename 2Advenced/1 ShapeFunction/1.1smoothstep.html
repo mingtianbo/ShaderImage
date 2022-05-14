@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmoothStep函数</title>
+    <style>
+    </style>
+</head>
+<body>
+    <!-- 将场景放进容器中 -->
+    <div id="container"></div>
+
+    <!-- 引入three.js -->
+    <script src="http://threejs.org/build/three.min.js"></script>
+
+    <!-- 顶点着色器 -->
+    <script id="vertexShader" type="x-shader/x-vertex">
+        // 使用ShaderMaterial类，顶点位置变量position无需声明，顶点着色器可以直接调用
+        // attribute vec3 position;
+        void main(){
+          // 逐顶点处理：顶点位置数据赋值给内置变量gl_Position
+          gl_Position = vec4( position, 1.0 );
+        }
+    </script>
+
+    <!-- 片段着色器 -->
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        precision mediump float;
+        //画布尺寸（宽、高）
+        uniform vec2 u_resolution;
+
+        //用smoothstep计算插值绘制曲线
+        float plot(vec2 st, float pct){
+          return  smoothstep( pct-0.02, pct, st.y) -
+                  smoothstep( pct, pct+0.02, st.y);
+        }
+
+        void main() {
+            vec2 st = gl_FragCoord.xy/u_resolution;
+
+            float y = smoothstep(0.2,0.5,st.x) - smoothstep(0.5,0.8,st.x);
+
+            vec3 color = vec3(y);
+
+            //绘制
+            float pct = plot(st,y);
+            color = (1.0-pct)*color+pct*vec3(0.0,1.0,0.0);
+
+            gl_FragColor = vec4(color,1.0);
+        }
+    </script>
+
+    <script>
+        var container;
+        var camera, scene, renderer, clock;
+        var uniforms;
+        var mouse = {x:0, y:0};
+
+        document.onmousemove = getMouseXY;
+
+        //初始化渲染
+        init();
+        //不停调用渲染
+        animate();
+
+        // 获得鼠标位置
+        function getMouseXY(e) {
+            mouse.x = e.pageX;
+            mouse.y = e.pageY;
+        }
+
+        function init() {
+            //得到div标签内容
+            container = document.getElementById( 'container' );
+
+            //创建场景对象Scene
+            scene = new THREE.Scene();
+            //创建追踪时间对象Clock
+            clock = new THREE.Clock();
+
+            //创建相机对象
+            // var width = window.innerWidth; //窗口宽度
+            // var height = window.innerHeight; //窗口高度
+            // 与输出画布canvas的宽高比例保持一致
+            // var width = 300; //窗口宽度
+            // var height = 300; //窗口高度
+            // var k = width / height; //窗口宽高比
+            // var s = 150; //三维场景显示范围控制系数，系数越大，显示的范围越大
+            // //创建相机对象
+            // var camera = new THREE.OrthographicCamera(-s * k, s * k, s, -s, 1, 1000);
+            // camera.position.set(200, 300, 200); //设置相机位置
+            // camera.lookAt(scene.position); //设置相机方向(指向的场景对象)
+            camera = new THREE.Camera();
+            camera.position.set(200, 300, 200);  //设置相机位置
+
+
+            //创建一个平面缓冲几何体对象（width, height）
+            var geometry = new THREE.PlaneBufferGeometry( 2, 2 );
+
+            //接受uniforms值
+            uniforms = {
+                u_time: { type: "f", value: 1.0 },
+                u_mouse: { type: "v2", value: new THREE.Vector2() },
+                u_resolution: { type: "v2", value: new THREE.Vector2() }
+            };
+
+            //原生着色器材质RawShaderMaterial
+            var material = new THREE.ShaderMaterial( {
+                //传入除顶点数据以外的数据
+                uniforms: uniforms,
+                //顶点着色器对象vertexShader
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                // 片元着色器对象fragmentShader
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+            } );
+
+            //网格模型
+            var mesh = new THREE.Mesh( geometry, material );
+            scene.add( mesh );//将网格模型插入到场景中
+
+            //创建渲染器对象
+            renderer = new THREE.WebGLRenderer();
+            // renderer.setSize(width, height); //设置渲染区域尺寸
+            // 设置渲染区域尺寸，本质就是设置输出canvas的尺寸
+            renderer.setSize(300, 300);
+            renderer.setClearColor(0xb9d3ff, 1); //设置背景颜色
+            renderer.setPixelRatio( window.devicePixelRatio );//设置设备像素比。通常用于避免HiDPI设备上绘图模糊
+
+            //把渲染器的渲染结果canvas对象插入到'container'对应的div元素中
+            container.appendChild( renderer.domElement );
+            console.log(container);
+
+            onWindowResize();
+            window.addEventListener( 'resize', onWindowResize, false );
+        }
+
+        function onWindowResize( event ) {
+            //renderer.setSize( window.innerWidth, window.innerHeight );
+            renderer.setSize( 300, 300 );
+            uniforms.u_resolution.value.x = renderer.domElement.width;
+            uniforms.u_resolution.value.y = renderer.domElement.height;
+            uniforms.u_mouse.value.x = mouse.x;
+            uniforms.u_mouse.value.y = mouse.y;
+        }
+
+        //请求再次执行渲染操作，渲染下一帧
+        function animate() {
+            requestAnimationFrame( animate );
+            render();
+        }
+
+        //渲染函数
+        function render() {
+            uniforms.u_time.value += clock.getDelta();
+            renderer.render( scene, camera );//执行渲染操作
+        }
+    </script>
+</body>
+</html>

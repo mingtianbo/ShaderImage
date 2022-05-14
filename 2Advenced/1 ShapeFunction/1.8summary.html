@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小结</title>
+    <style>
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <script src="http://threejs.org/build/three.min.js"></script>
+
+    <script id="vertexShader" type="x-shader/x-vertex">
+        void main() {
+            gl_Position = vec4( position, 1.0 );
+        }
+    </script>
+
+    <script id="fragmentShader" type="x-shader/x-fragment">
+        #define PI 3.14159265359
+#define TWO_PI 6.28318530718
+
+uniform vec2 u_resolution;
+uniform float u_time;
+
+float shape(vec2 st, float N){
+    st = st*2.-1.;
+    float a = atan(st.x,st.y)+PI;
+    float r = TWO_PI/N;
+    return abs(cos(floor(.5+a/r)*r-a)*length(st));
+}
+
+float box(vec2 st, vec2 size){
+    return shape(st*size,4.);
+}
+
+float rect(vec2 _st, vec2 _size){
+    _size = vec2(0.5)-_size*0.5;
+    vec2 uv = smoothstep(_size,_size+vec2(1e-4),_st);
+    uv *= smoothstep(_size,_size+vec2(1e-4),vec2(1.0)-_st);
+    return uv.x*uv.y;
+}
+
+float hex(vec2 st, float a, float b, float c, float d, float e, float f){
+    st = st*vec2(2.,6.);
+
+    vec2 fpos = fract(st);
+    vec2 ipos = floor(st);
+
+    if (ipos.x == 1.0) fpos.x = 1.-fpos.x;
+    if (ipos.y < 1.0){
+        return mix(box(fpos, vec2(0.84,1.)),box(fpos-vec2(0.03,0.),vec2(1.)),a);
+    } else if (ipos.y < 2.0){
+        return mix(box(fpos, vec2(0.84,1.)),box(fpos-vec2(0.03,0.),vec2(1.)),b);
+    } else if (ipos.y < 3.0){
+        return mix(box(fpos, vec2(0.84,1.)),box(fpos-vec2(0.03,0.),vec2(1.)),c);
+    } else if (ipos.y < 4.0){
+        return mix(box(fpos, vec2(0.84,1.)),box(fpos-vec2(0.03,0.),vec2(1.)),d);
+    } else if (ipos.y < 5.0){
+        return mix(box(fpos, vec2(0.84,1.)),box(fpos-vec2(0.03,0.),vec2(1.)),e);
+    } else if (ipos.y < 6.0){
+        return mix(box(fpos, vec2(0.84,1.)),box(fpos-vec2(0.03,0.),vec2(1.)),f);
+    }
+    return 0.0;
+}
+
+float hex(vec2 st, float N){
+    float b[6];
+    float remain = floor(mod(N,64.));
+    for(int i = 0; i < 6; i++){
+        b[i] = 0.0;
+        b[i] = step(1.0,mod(remain,2.));
+        remain = ceil(remain/2.);
+    }
+    return hex(st,b[0],b[1],b[2],b[3],b[4],b[5]);
+}
+
+void main(){
+    vec2 st = gl_FragCoord.xy/u_resolution.xy;
+    st.y *= u_resolution.y/u_resolution.x;
+
+    st *= 10.0;
+    vec2 fpos = fract(st);
+    vec2 ipos = floor(st);
+
+    float t = u_time*5.0;
+    float df = 1.0;
+    df = hex(fpos,ipos.x+ipos.y+t)+(1.0-rect(fpos,vec2(0.7)));
+
+    gl_FragColor = vec4(mix(vec3(0.),vec3(1.),step(0.7,df)),1.0);
+}
+    </script>
+
+    <script>
+        var container;
+        var camera, scene, renderer, clock;
+        var uniforms;
+        var mouse = {x:0, y:0};
+
+        document.onmousemove = getMouseXY;
+
+        init();
+        animate();
+
+        function getMouseXY(e) {
+            mouse.x = e.pageX;
+            mouse.y = e.pageY;
+        }
+
+        function init() {
+            container = document.getElementById( 'container' );
+
+            camera = new THREE.Camera();
+            camera.position.z = 1;
+
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+
+            var geometry = new THREE.PlaneBufferGeometry( 2, 2 );
+
+            uniforms = {
+                u_time: { type: "f", value: 1.0 },
+                u_mouse: { type: "v2", value: new THREE.Vector2() },
+                u_resolution: { type: "v2", value: new THREE.Vector2() }
+            };
+
+            var material = new THREE.ShaderMaterial( {
+                uniforms: uniforms,
+                vertexShader: document.getElementById( 'vertexShader' ).textContent,
+                fragmentShader: document.getElementById( 'fragmentShader' ).textContent
+            } );
+
+            var mesh = new THREE.Mesh( geometry, material );
+            scene.add( mesh );
+
+            renderer = new THREE.WebGLRenderer();
+            renderer.setPixelRatio( window.devicePixelRatio );
+
+            container.appendChild( renderer.domElement );
+
+            onWindowResize();
+            window.addEventListener( 'resize', onWindowResize, false );
+        }
+
+        function onWindowResize( event ) {
+            renderer.setSize( window.innerWidth, window.innerHeight );
+            uniforms.u_resolution.value.x = renderer.domElement.width;
+            uniforms.u_resolution.value.y = renderer.domElement.height;
+            uniforms.u_mouse.value.x = mouse.x;
+            uniforms.u_mouse.value.y = mouse.y;
+        }
+
+        function animate() {
+            requestAnimationFrame( animate );
+            render();
+        }
+
+        function render() {
+            uniforms.u_time.value += clock.getDelta();
+            renderer.render( scene, camera );
+        }
+    </script>
+</body>
+</html>
